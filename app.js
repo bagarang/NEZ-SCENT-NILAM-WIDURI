@@ -285,14 +285,14 @@ function renderDashboard(dateFrom, dateTo) {
     };
     var resetBtn = document.getElementById('dashResetBtn');
     if (resetBtn) resetBtn.onclick = function () { renderDashboard(); };
-    drawBar('c1', d.top5ByCount.map(function (x) { return x.label; }), d.top5ByCount.map(function (x) { return x.value; }), '#c1622e');
-    drawBar('c2', d.top5ByNominal.map(function (x) { return x.label; }), d.top5ByNominal.map(function (x) { return x.value; }), '#e2984f', true);
+    drawBar('c1', d.top5ByCount.map(function (x) { return x.label; }), d.top5ByCount.map(function (x) { return x.value; }), '#fe634e');
+    drawBar('c2', d.top5ByNominal.map(function (x) { return x.label; }), d.top5ByNominal.map(function (x) { return x.value; }), '#5b57e0', true);
     drawDoughnut('c3', d.statusAgen.map(function (x) { return x.label; }), d.statusAgen.map(function (x) { return x.value; }));
-    drawBar('c4', d.top5SO.map(function (x) { return x.label; }), d.top5SO.map(function (x) { return x.value; }), '#6f9463', true);
+    drawBar('c4', d.top5SO.map(function (x) { return x.label; }), d.top5SO.map(function (x) { return x.value; }), '#2bc155', true);
     drawDoughnut('c5', d.statusSO.map(function (x) { return x.label; }), d.statusSO.map(function (x) { return x.value; }));
     drawBar('c6', ['Scheduled', 'Completed', 'Failed'],
       [d.taskStatus.scheduled, d.taskStatus.completed, d.taskStatus.failed || 0],
-      ['#8f461d', '#6f9463', '#c1503c']);
+      ['#ffab2e', '#2bc155', '#ff4847']);
   }).catch(function (err) { toast(err.message, 'error'); });
 }
 
@@ -326,7 +326,7 @@ function badgeHtml(val) {
   return '<span class="badge ' + badgeClass(val) + '">' + esc(val || '-') + '</span>';
 }
 
-var CHART_PALETTE = ['#c1622e', '#e2984f', '#f4b183', '#8f461d', '#6f9463', '#d99a3d', '#a3714f', '#c1503c'];
+var CHART_PALETTE = ['#fe634e', '#5b57e0', '#2bc155', '#ffab2e', '#ffb199', '#d84534', '#8a8fa3', '#ff4847'];
 
 function destroyChart_(id) {
   if (STATE.charts[id]) { STATE.charts[id].destroy(); delete STATE.charts[id]; }
