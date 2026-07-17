@@ -1,7 +1,7 @@
 /* ===================================================================
    NEZ SCENT AGEN DASHBOARD — client app (vanilla JS SPA)
    Frontend berdiri sendiri (di-hosting di Netlify), Spreadsheet tetap
-   jadi database, Google Apps Script cuma jadi API JSON.
+   jadi database, Google Apps Script cuma jadi API JSON .
    =================================================================== */
 
 /**
