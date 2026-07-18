@@ -134,11 +134,11 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------- Cards / grid ---------- */
 .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 22px; }
 .kpi-card {
-  background: var(--card-bg); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow);
+  background: var(--card-bg); border-radius: var(--radius); padding: 20px 22px;
   border-left: 4px solid var(--primary); border-top: 1px solid var(--border); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
-  transition: transform .15s, box-shadow .15s;
+  transition: transform .15s;
 }
-.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.kpi-card:hover { transform: translateY(-2px); }
 .kpi-card:nth-child(4n+2) { border-left-color: var(--accent); }
 .kpi-card:nth-child(4n+3) { border-left-color: var(--success); }
 .kpi-card:nth-child(4n+4) { border-left-color: var(--warning); }

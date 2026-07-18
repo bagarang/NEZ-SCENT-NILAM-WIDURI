@@ -424,7 +424,7 @@ var ENTITY_ACTIVITY = {
   searchFields: ['agen', 'contactPerson', 'admin', 'contactMethod'],
   columns: [
     { field: 'date', label: 'Tanggal', fmt: 'date' }, { field: 'agen', label: 'Agen' },
-    { field: 'contactPerson', label: 'Contact Person' }, { field: 'contactMethod', label: 'Metode' },
+    { field: 'contactMethod', label: 'Metode' },
     { field: 'admin', label: 'Admin' },
     { field: 'notes', label: 'Notes', truncate: true }
   ],
