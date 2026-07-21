@@ -1443,7 +1443,45 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Nez Scent App')
     .addItem('1) Jalankan Setup Awal', 'runInitialSetup')
+    .addItem('2) Rapikan Baris Nyasar (percepat loading)', 'cleanupOrphanRows')
     .addToUi();
+}
+
+/**
+ * PERBAIKAN SEKALI JALAN: sebelum fix ini ada, baris baru yang ditambah
+ * lewat web app bisa "nyasar" jauh di bawah (misal baris ke-12.000-an)
+ * karena salah baca baris kosong berformat sisa template lama. Fungsi
+ * ini memadatkan ulang setiap tabel: baris yang ada isinya dikumpulkan
+ * lalu ditulis ulang rapat dari baris data pertama, sisanya dikosongkan.
+ * Aman dijalankan berkali-kali. Jalankan SEKALI setelah update Code.gs
+ * ini untuk langsung merasakan loading yang jauh lebih cepat.
+ */
+function cleanupOrphanRows() {
+  var defs = [TABLES.AGEN, TABLES.TASKS, TABLES.ACTIVITY, TABLES.PI, TABLES.SO, TABLES.GIFTS];
+  var report = [];
+
+  defs.forEach(function (tableDef) {
+    var sheet = getDB_().getSheetByName(tableDef.sheet);
+    if (!sheet) return;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < tableDef.dataStart) { report.push(tableDef.sheet + ': kosong, dilewati.'); return; }
+
+    var numRows = lastRow - tableDef.dataStart + 1;
+    var range = sheet.getRange(tableDef.dataStart, 1, numRows, tableDef.lastCol);
+    var values = range.getValues();
+
+    var fields = Object.keys(tableDef.cols);
+    var firstColIdx = tableDef.cols[fields[0]] - 1;
+    var realRows = values.filter(function (row) { return row[firstColIdx] !== '' && row[firstColIdx] !== null; });
+
+    range.clearContent(); // kosongkan seluruh rentang lama (termasuk baris nyasar di bawah)
+    if (realRows.length) {
+      sheet.getRange(tableDef.dataStart, 1, realRows.length, tableDef.lastCol).setValues(realRows);
+    }
+    report.push(tableDef.sheet + ': ' + realRows.length + ' baris asli dipadatkan (dari rentang ' + numRows + ' baris menjadi ' + realRows.length + ').');
+  });
+
+  SpreadsheetApp.getUi().alert('Cleanup selesai!\n\n' + report.join('\n'));
 }
 
 
