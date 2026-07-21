@@ -251,14 +251,14 @@ function renderDashboard(dateFrom, dateTo) {
         '</div>' +
       '</div>' +
       '<div class="kpi-grid">' +
-        kpiCard(d.kpi.totalAgen, 'Total Agen') +
-        kpiCard(d.kpi.activities7d, 'Activities Last 7 Days') +
-        kpiCard(d.kpi.activities30d, 'Activities Last 30 Days') +
-        kpiCard(d.kpi.piMade, 'PI Made' + (d.hasFilter ? ' (sesuai filter)' : '')) +
+        kpiCard(d.kpi.totalAgen, 'Total Agen', '\u{1F3EC}', KPI_ICON_COLORS.primary) +
+        kpiCard(d.kpi.activities7d, 'Activities Last 7 Days', '\u{1F4DE}', KPI_ICON_COLORS.accent) +
+        kpiCard(d.kpi.activities30d, 'Activities Last 30 Days', '\u{1F5D3}\u{FE0F}', KPI_ICON_COLORS.success) +
+        kpiCard(d.kpi.piMade, 'PI Made' + (d.hasFilter ? ' (sesuai filter)' : ''), '\u{1F4C4}', KPI_ICON_COLORS.warning) +
       '</div>' +
       '<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">' +
-        kpiCard(d.kontak.target, 'Target Kontak / Bulan') +
-        kpiCard(d.kontak.realisasi, 'Realisasi Kontak (' + (d.hasFilter ? 'sesuai filter' : 'bulan ini') + ')') +
+        kpiCard(d.kontak.target, 'Target Kontak / Bulan', '\u{1F3AF}', KPI_ICON_COLORS.primary) +
+        kpiCard(d.kontak.realisasi, 'Realisasi Kontak (' + (d.hasFilter ? 'sesuai filter' : 'bulan ini') + ')', '\u{2705}', KPI_ICON_COLORS.accent) +
         pencapaianKpiCard(d.kontak.pencapaian) +
       '</div>' +
       '<div class="chart-grid">' +
@@ -298,19 +298,32 @@ function renderDashboard(dateFrom, dateTo) {
 
 function truncate_(s, n) { s = s || ''; return s.length > n ? s.slice(0, n) + '...' : s; }
 
-function kpiCard(val, label) {
-  return '<div class="kpi-card"><div class="val">' + esc(val) + '</div><div class="lbl">' + esc(label) + '</div></div>';
+// Ikon + warna tiap kartu KPI (pakai kode hex asli tema biar bisa dibikin
+// versi transparan buat background badge-nya)
+var KPI_ICON_COLORS = {
+  primary: '#fe634e', accent: '#5b57e0', success: '#2bc155', warning: '#ffab2e', danger: '#ff4847'
+};
+function kpiIconBadge_(icon, hex) {
+  return '<div class="kpi-icon" style="background:' + hex + '22;color:' + hex + ';">' + icon + '</div>';
+}
+function kpiCard(val, label, icon, hex) {
+  hex = hex || KPI_ICON_COLORS.primary;
+  return '<div class="kpi-card">' +
+    '<div class="kpi-card-top">' + kpiIconBadge_(icon || '\u{1F4CA}', hex) + '<div class="lbl">' + esc(label) + '</div></div>' +
+    '<div class="val">' + esc(val) + '</div>' +
+  '</div>';
 }
 function pencapaianKpiCard(pencapaian) {
   if (pencapaian === null || pencapaian === undefined) {
-    return '<div class="kpi-card" style="border-left-color:var(--text-muted);">' +
-      '<div class="val" style="color:var(--text-muted);">-</div>' +
-      '<div class="lbl">% Pencapaian Kontak (atur target di Setup)</div></div>';
+    return '<div class="kpi-card">' +
+      '<div class="kpi-card-top">' + kpiIconBadge_('\u{1F4C8}', '#93796a') + '<div class="lbl">% Pencapaian Kontak (atur target di Setup)</div></div>' +
+      '<div class="val" style="color:var(--text-muted);">-</div></div>';
   }
-  var color = pencapaian >= 100 ? 'var(--success)' : (pencapaian >= 70 ? 'var(--warning)' : 'var(--danger)');
-  return '<div class="kpi-card" style="border-left-color:' + color + ';">' +
-    '<div class="val" style="color:' + color + ';">' + pencapaian + '%</div>' +
-    '<div class="lbl">% Pencapaian Kontak</div></div>';
+  var hex = pencapaian >= 100 ? KPI_ICON_COLORS.success : (pencapaian >= 70 ? KPI_ICON_COLORS.warning : KPI_ICON_COLORS.danger);
+  return '<div class="kpi-card">' +
+    '<div class="kpi-card-top">' + kpiIconBadge_('\u{1F4C8}', hex) + '<div class="lbl">% Pencapaian Kontak</div></div>' +
+    '<div class="val" style="color:' + hex + ';">' + pencapaian + '%</div>' +
+  '</div>';
 }
 function chartCard(id, title) {
   return '<div class="card"><h3>' + esc(title) + '</h3><div class="chart-holder"><canvas id="' + id + '"></canvas></div></div>';
@@ -424,7 +437,7 @@ var ENTITY_ACTIVITY = {
   searchFields: ['agen', 'contactPerson', 'admin', 'contactMethod'],
   columns: [
     { field: 'date', label: 'Tanggal', fmt: 'date' }, { field: 'agen', label: 'Agen' },
-    { field: 'contactMethod', label: 'Metode' },
+    { field: 'contactPerson', label: 'Contact Person' }, { field: 'contactMethod', label: 'Metode' },
     { field: 'admin', label: 'Admin' },
     { field: 'notes', label: 'Notes', truncate: true }
   ],
