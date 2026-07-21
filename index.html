@@ -3,21 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nez Scent — Agen Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>">
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <title>Sistem Manajemen Apps</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <div class="loading-spin" style="margin-top:200px;"></div>
+  <!-- LAYER PALING BELAKANG: Background Dinamis -->
+  <div id="app-background"></div>
+
+  <!-- CONTAINER UTAMA -->
+  <div class="app-layout">
+    
+    <!-- SIDEBAR MENU -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Menu Utama</h2>
+      </div>
+      
+      <!-- List Menu / Thumbnail -->
+      <div class="menu-list">
+        <!-- Menu Dashboard -->
+        <div class="menu-thumbnail nav-link active" 
+             data-page="dashboard" 
+             data-bg-url="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1920&q=80" 
+             onclick="navigate('dashboard')">
+          <div class="menu-content">
+            <span>Dashboard</span>
+          </div>
+        </div>
+
+        <!-- Menu Agen -->
+        <div class="menu-thumbnail nav-link" 
+             data-page="agen" 
+             data-bg-url="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1920&q=80" 
+             onclick="navigate('agen')">
+          <div class="menu-content">
+            <span>Data Agen</span>
+          </div>
+        </div>
+
+        <!-- Menu Tasks -->
+        <div class="menu-thumbnail nav-link" 
+             data-page="tasks" 
+             data-bg-url="https://images.unsplash.com/photo-1507925922837-326f466362f5?auto=format&fit=crop&w=1920&q=80" 
+             onclick="navigate('tasks')">
+          <div class="menu-content">
+            <span>Daftar Tasks</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- KONTEN UTAMA -->
+    <main class="main-content">
+      <header class="top-header">
+        <h1 id="pageTitle">Dashboard</h1>
+        <div class="header-actions">
+          <input type="text" id="crudSearch" placeholder="Cari data..." onkeyup="handleSearch()">
+        </div>
+      </header>
+
+      <!-- Hasil Render Data / Spinner masuk ke sini -->
+      <div id="content">
+        <!-- Konten awal saat load -->
+      </div>
+    </main>
+    
   </div>
-  <div id="toast" class="toast"></div>
 
   <script src="app.js"></script>
 </body>
