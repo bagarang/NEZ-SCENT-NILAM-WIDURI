@@ -180,3 +180,51 @@ copy-paste 1 kali, tidak perlu bikin belasan file manual.
 Kalau sebelumnya sudah sempat setup versi banyak-file, tinggal hapus
 semua file lama itu di editor Apps Script, sisakan satu `Code.gs`, lalu
 paste isi file gabungan yang baru.
+
+---
+
+## 15. Changelog v8 — Approval Recreate, Link Screenshot, Download Report, Detail Notes, Logo Loading
+
+1. **Task → Recreate sekarang butuh persetujuan Sales Manager**:
+   - Tombol **Recreate** di task overdue (misal Visit Plan Zahra) sekarang
+     mengajukan **permintaan**, bukan langsung membuat task baru.
+   - Sales Manager dapat **notifikasi** (badge angka merah di menu sidebar
+     "Tasks") dan panel **"Permintaan Recreate Menunggu Persetujuan"** di
+     atas halaman Task Tracker, lengkap tombol **Confirm** / **Decline**.
+   - Kalau **Confirm**: baru task lama ditandai **Failed** dan task baru
+     dibuat dengan Due Date baru — tetap **2 baris data** (overdue lama +
+     scheduled baru), tidak ada yang ditimpa/di-replace, sama seperti
+     perilaku Recreate sebelumnya.
+   - Kalau **Decline**: tidak ada perubahan apa pun ke Task.
+   - Permintaan tersimpan di sheet baru **`RecreateRequests`** (dibuat
+     otomatis saat `runInitialSetup` dijalankan ulang).
+2. **Activity Log**: field baru **"Link Screenshot"** di popup Tambah/Edit
+   (kolom I baru di Sheet Activity). Dipakai untuk KPI baru di Dashboard:
+   **"Kepatuhan Foto"** — persentase Activity yang sudah melampirkan link
+   screenshot dari total Activity (ikut filter tanggal Dashboard kalau ada).
+3. **Dashboard**: tombol **"Download Report"** di pojok kanan atas (sebelah
+   filter tanggal) — mengunduh 1 file **CSV** berisi semua data yang tampil
+   di Dashboard (KPI, Top 5, status, task status, kontak, kepatuhan foto,
+   dan semua daftar "Recent"), bisa langsung dibuka di Excel/Google Sheets.
+4. **Activity Log**: tombol baru **"Lihat"** di tiap baris — membuka panel
+   detail yang menampilkan isi **Notes lengkap** (tidak dipotong seperti di
+   kolom list) beserta Link Screenshot-nya (kalau ada, bisa diklik).
+5. **Halaman loading pertama** (sebelum app.js selesai render) sekarang
+   menampilkan **logo Nez Scent** di atas spinner-nya.
+
+**File yang berubah:**
+- Backend: `Code.gs` (kolom baru di Activity, sheet baru
+  `RecreateRequests`, endpoint baru `apiRequestRecreateTask` /
+  `apiListRecreateRequests` / `apiDecideRecreateTask`, KPI Kepatuhan Foto
+  di `apiGetDashboard`).
+- Frontend: `app.js`, `styles.css`, `index.html`, dan file baru `logo.png`
+  (taruh di folder `netlify-frontend` yang sama dengan `index.html`).
+
+**Cara update:**
+1. Timpa `Code.gs` ke project Apps Script → **Deploy → Manage deployments
+   → New version → Deploy**.
+2. Jalankan ulang **`runInitialSetup`** sekali dari editor Apps Script
+   (aman dijalankan berkali-kali) supaya sheet `RecreateRequests` dan
+   kolom "LINK SCREENSHOT" di Activity otomatis dibuat.
+3. Drag & drop ulang folder `netlify-frontend` (sudah termasuk `logo.png`)
+   ke halaman **Deploys** situs Netlify kamu.

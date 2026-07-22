@@ -154,6 +154,12 @@ function logout() {
 function afterLogin() {
   api('apiGetFormOptions', STATE.token).then(function (opts) {
     STATE.formOptions = opts;
+    if (STATE.user.role === 'Manager') {
+      return api('apiListRecreateRequests', STATE.token).then(function (reqs) {
+        STATE.pendingRecreateCount = reqs.length;
+      }).catch(function () { STATE.pendingRecreateCount = 0; });
+    }
+  }).then(function () {
     renderShell();
     navigate('dashboard');
   }).catch(function (err) { toast(err.message, 'error'); });
@@ -164,7 +170,11 @@ function renderShell() {
   var role = STATE.user.role;
   var links = MENU.filter(function (m) { return m.roles.indexOf(role) !== -1; })
     .map(function (m) {
-      return '<a href="#" class="nav-link" data-page="' + m.key + '"><span>' + m.icon + '</span><span>' + m.label + '</span></a>';
+      var showBadge = m.key === 'tasks' && role === 'Manager' && STATE.pendingRecreateCount;
+      var badge = showBadge
+        ? '<span class="recreate-badge" style="margin-left:auto;background:var(--danger);color:#fff;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:700;">' + STATE.pendingRecreateCount + '</span>'
+        : '';
+      return '<a href="#" class="nav-link" data-page="' + m.key + '" style="display:flex;"><span>' + m.icon + '</span><span>' + m.label + '</span>' + badge + '</a>';
     }).join('');
 
   document.getElementById('app').innerHTML =
@@ -201,6 +211,17 @@ function renderShell() {
   };
   document.getElementById('overlayBg').onclick = closeSidebar;
 }
+/** Update angka badge notifikasi "Recreate Menunggu Persetujuan" di sidebar tanpa render ulang seluruh shell. */
+function updateRecreateBadge_() {
+  var badgeEl = document.querySelector('.recreate-badge');
+  if (!badgeEl) return;
+  if (STATE.pendingRecreateCount > 0) {
+    badgeEl.textContent = STATE.pendingRecreateCount;
+  } else {
+    badgeEl.remove();
+  }
+}
+
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('overlayBg').classList.remove('show');
@@ -248,6 +269,7 @@ function renderDashboard(dateFrom, dateTo) {
           '<input type="date" id="dashTo" class="search-input" style="min-width:150px;" value="' + esc(dateTo || '') + '">' +
           '<button class="btn sm" id="dashApplyBtn">Terapkan</button>' +
           (d.hasFilter ? '<button class="btn secondary sm" id="dashResetBtn">Reset</button>' : '') +
+          '<button class="btn secondary sm" id="dashDownloadBtn">\u2B07 Download Report</button>' +
         '</div>' +
       '</div>' +
       '<div class="kpi-grid">' +
@@ -256,10 +278,11 @@ function renderDashboard(dateFrom, dateTo) {
         kpiCard(d.kpi.activities30d, 'Activities Last 30 Days', '\u{1F5D3}\u{FE0F}', KPI_ICON_COLORS.success) +
         kpiCard(d.kpi.piMade, 'PI Made' + (d.hasFilter ? ' (sesuai filter)' : ''), '\u{1F4C4}', KPI_ICON_COLORS.warning) +
       '</div>' +
-      '<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">' +
+      '<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);">' +
         kpiCard(d.kontak.target, 'Target Kontak / Bulan', '\u{1F3AF}', KPI_ICON_COLORS.primary) +
         kpiCard(d.kontak.realisasi, 'Realisasi Kontak (' + (d.hasFilter ? 'sesuai filter' : 'bulan ini') + ')', '\u{2705}', KPI_ICON_COLORS.accent) +
         pencapaianKpiCard(d.kontak.pencapaian) +
+        fotoKpiCard(d.kepatuhanFoto) +
       '</div>' +
       '<div class="chart-grid">' +
         chartCard('c1', 'Top 5 Agen (Jumlah PI)') +
@@ -285,6 +308,7 @@ function renderDashboard(dateFrom, dateTo) {
     };
     var resetBtn = document.getElementById('dashResetBtn');
     if (resetBtn) resetBtn.onclick = function () { renderDashboard(); };
+    document.getElementById('dashDownloadBtn').onclick = function () { downloadDashboardReport_(d, dateFrom, dateTo); };
     drawBar('c1', d.top5ByCount.map(function (x) { return x.label; }), d.top5ByCount.map(function (x) { return x.value; }), '#fe634e');
     drawBar('c2', d.top5ByNominal.map(function (x) { return x.label; }), d.top5ByNominal.map(function (x) { return x.value; }), '#5b57e0', true);
     drawDoughnut('c3', d.statusAgen.map(function (x) { return x.label; }), d.statusAgen.map(function (x) { return x.value; }));
@@ -297,6 +321,102 @@ function renderDashboard(dateFrom, dateTo) {
 }
 
 function truncate_(s, n) { s = s || ''; return s.length > n ? s.slice(0, n) + '...' : s; }
+
+/**
+ * Download Report: export seluruh data yang tampil di Dashboard (KPI, Top 5,
+ * status, task status, kontak, kepatuhan foto, dan daftar Recent) jadi 1
+ * file CSV supaya bisa dibuka/disimpan/dilampirkan (Excel/Sheets bisa buka
+ * file ini langsung). Tidak butuh library tambahan - murni Blob + <a download>.
+ */
+function csvEscape_(v) {
+  var s = v === null || v === undefined ? '' : String(v);
+  if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function csvRow_(arr) { return arr.map(csvEscape_).join(',') + '\r\n'; }
+
+function downloadDashboardReport_(d, dateFrom, dateTo) {
+  var lines = '';
+  lines += csvRow_(['Nez Scent - Dashboard Report']);
+  lines += csvRow_(['Diunduh pada', new Date().toLocaleString('id-ID')]);
+  lines += csvRow_(['Rentang Filter', dateFrom || dateTo ? ((dateFrom || '-') + ' s/d ' + (dateTo || '-')) : 'Semua Data']);
+  lines += csvRow_([]);
+
+  lines += csvRow_(['KPI UTAMA']);
+  lines += csvRow_(['Total Agen', d.kpi.totalAgen]);
+  lines += csvRow_(['Activities Last 7 Days', d.kpi.activities7d]);
+  lines += csvRow_(['Activities Last 30 Days', d.kpi.activities30d]);
+  lines += csvRow_(['PI Made', d.kpi.piMade]);
+  lines += csvRow_(['Target Kontak / Bulan', d.kontak.target]);
+  lines += csvRow_(['Realisasi Kontak', d.kontak.realisasi]);
+  lines += csvRow_(['% Pencapaian Kontak', d.kontak.pencapaian === null ? '-' : d.kontak.pencapaian + '%']);
+  lines += csvRow_(['Kepatuhan Foto', d.kepatuhanFoto.withScreenshot + '/' + d.kepatuhanFoto.total + ' (' + (d.kepatuhanFoto.pencapaian === null ? '-' : d.kepatuhanFoto.pencapaian + '%') + ')']);
+  lines += csvRow_([]);
+
+  lines += csvRow_(['TOP 5 AGEN (JUMLAH PI)']);
+  lines += csvRow_(['Agen', 'Jumlah PI']);
+  d.top5ByCount.forEach(function (x) { lines += csvRow_([x.label, x.value]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['TOP 5 AGEN (NOMINAL PI)']);
+  lines += csvRow_(['Agen', 'Nominal']);
+  d.top5ByNominal.forEach(function (x) { lines += csvRow_([x.label, x.value]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['ACTIVE AGENT STATUS']);
+  lines += csvRow_(['Status', 'Jumlah']);
+  d.statusAgen.forEach(function (x) { lines += csvRow_([x.label, x.value]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['TOP 5 SALES ORDER (NOMINAL)']);
+  lines += csvRow_(['Agen', 'Nominal']);
+  d.top5SO.forEach(function (x) { lines += csvRow_([x.label, x.value]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['STATUS SO']);
+  lines += csvRow_(['Status', 'Jumlah']);
+  d.statusSO.forEach(function (x) { lines += csvRow_([x.label, x.value]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['TASK STATUS']);
+  lines += csvRow_(['Scheduled', d.taskStatus.scheduled]);
+  lines += csvRow_(['Completed', d.taskStatus.completed]);
+  lines += csvRow_(['Failed', d.taskStatus.failed]);
+  lines += csvRow_([]);
+
+  lines += csvRow_(['RECENT ACTIVITY']);
+  lines += csvRow_(['Tanggal', 'Agen', 'Kontak', 'Metode', 'Notes']);
+  d.recentActivity.forEach(function (r) { lines += csvRow_([fmtDate(r.date), r.agen, r.contactPerson, r.contactMethod, r.notes]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['UPCOMING TASKS']);
+  lines += csvRow_(['Due Date', 'Agen', 'Sisa Hari', 'Prioritas', 'Status']);
+  d.upcomingTasks.forEach(function (r) { lines += csvRow_([fmtDate(r.dueDate), r.agen, r.daysUntilDue, r.priority, r.status]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['RECENT PROFORMA INVOICE']);
+  lines += csvRow_(['No. PI', 'Agen', 'Nominal', 'Tanggal', 'Status']);
+  d.recentPI.forEach(function (r) { lines += csvRow_([r.nomorPI, r.agen, r.dealValue, fmtDate(r.piDate), r.statusPI]); });
+  lines += csvRow_([]);
+
+  lines += csvRow_(['RECENT SALES ORDER']);
+  lines += csvRow_(['No. SO', 'Agen', 'Nominal', 'Due Date', 'Status']);
+  d.recentSO.forEach(function (r) { lines += csvRow_([r.soNumber, r.agen, r.amount, fmtDate(r.dueDate), r.displayStatus]); });
+
+  var blob = new Blob(['\uFEFF' + lines], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'nez-scent-dashboard-report-' + todayStrClient_() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+function todayStrClient_() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
 
 // Ikon + warna tiap kartu KPI (pakai kode hex asli tema biar bisa dibikin
 // versi transparan buat background badge-nya)
@@ -322,6 +442,19 @@ function pencapaianKpiCard(pencapaian) {
   var hex = pencapaian >= 100 ? KPI_ICON_COLORS.success : (pencapaian >= 70 ? KPI_ICON_COLORS.warning : KPI_ICON_COLORS.danger);
   return '<div class="kpi-card">' +
     '<div class="kpi-card-top">' + kpiIconBadge_('\u{1F4C8}', hex) + '<div class="lbl">% Pencapaian Kontak</div></div>' +
+    '<div class="val" style="color:' + hex + ';">' + pencapaian + '%</div>' +
+  '</div>';
+}
+function fotoKpiCard(kepatuhanFoto) {
+  var pencapaian = kepatuhanFoto ? kepatuhanFoto.pencapaian : null;
+  if (pencapaian === null || pencapaian === undefined) {
+    return '<div class="kpi-card">' +
+      '<div class="kpi-card-top">' + kpiIconBadge_('\u{1F4F8}', '#93796a') + '<div class="lbl">Kepatuhan Foto</div></div>' +
+      '<div class="val" style="color:var(--text-muted);">-</div></div>';
+  }
+  var hex = pencapaian >= 90 ? KPI_ICON_COLORS.success : (pencapaian >= 60 ? KPI_ICON_COLORS.warning : KPI_ICON_COLORS.danger);
+  return '<div class="kpi-card">' +
+    '<div class="kpi-card-top">' + kpiIconBadge_('\u{1F4F8}', hex) + '<div class="lbl">Kepatuhan Foto (' + kepatuhanFoto.withScreenshot + '/' + kepatuhanFoto.total + ')</div></div>' +
     '<div class="val" style="color:' + hex + ';">' + pencapaian + '%</div>' +
   '</div>';
 }
@@ -446,6 +579,7 @@ var ENTITY_ACTIVITY = {
     { name: 'date', label: 'Tanggal', type: 'date', required: true },
     { name: 'admin', label: 'Admin', type: 'select', optionsKey: 'pic' },
     { name: 'contactMethod', label: 'Metode Kontak', type: 'select', optionsKey: 'metodeKontak' },
+    { name: 'linkScreenshot', label: 'Link Screenshot', type: 'text', full: true },
     { name: 'notes', label: 'Notes', type: 'textarea', full: true }
   ]
 };
@@ -504,13 +638,53 @@ var ENTITY_GIFTS = {
 var CRUD_CACHE = {};
 
 function renderCrudPage(entity) {
+  if (entity.key === 'tasks') { renderTaskPage_(); return; }
   api(entity.listFn, STATE.token).then(function (rows) {
     CRUD_CACHE[entity.key] = rows;
     paintCrudPage(entity, rows, '');
   }).catch(function (err) { toast(err.message, 'error'); });
 }
 
-function paintCrudPage(entity, rows, query) {
+/**
+ * Task Tracker punya panel tambahan khusus Sales Manager: daftar permintaan
+ * Recreate yang menunggu Confirm/Decline (fitur approval visit plan).
+ */
+function renderTaskPage_() {
+  var calls = [api('apiListTasks', STATE.token)];
+  var isManager = STATE.user.role === 'Manager';
+  if (isManager) calls.push(api('apiListRecreateRequests', STATE.token));
+  Promise.all(calls).then(function (results) {
+    var rows = results[0];
+    var pendingRequests = isManager ? results[1] : [];
+    CRUD_CACHE.tasks = rows;
+    paintCrudPage(ENTITY_TASKS, rows, '', pendingRequests);
+  }).catch(function (err) { toast(err.message, 'error'); });
+}
+
+function approvalPanelHtml_(pendingRequests) {
+  if (!pendingRequests || !pendingRequests.length) return '';
+  var rows = pendingRequests.map(function (r) {
+    return '<tr>' +
+      '<td>' + esc(r.agen) + '</td>' +
+      '<td>' + esc(fmtDate(r.oldDueDate)) + '</td>' +
+      '<td>' + esc(fmtDate(r.newDueDate)) + '</td>' +
+      '<td>' + esc(r.requestedBy) + '</td>' +
+      '<td>' + esc(fmtDate(r.requestedAt)) + '</td>' +
+      '<td><div class="row-actions">' +
+        '<button class="btn sm" style="background:var(--success);" data-approve="' + r._row + '">Confirm</button>' +
+        '<button class="btn danger sm" data-decline="' + r._row + '">Decline</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+  return '<div class="card" style="margin-bottom:18px;border-left:4px solid var(--warning);">' +
+    '<h3>\u{1F514} Permintaan Recreate Menunggu Persetujuan (' + pendingRequests.length + ')</h3>' +
+    '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
+      '<th>Agen</th><th>Due Date Lama</th><th>Due Date Baru</th><th>Diajukan Oleh</th><th>Tanggal</th><th></th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+  '</div>';
+}
+
+function paintCrudPage(entity, rows, query, pendingRequests) {
   var c = document.getElementById('content');
   var filtered = filterRows_(rows, entity.searchFields, query);
 
@@ -518,6 +692,8 @@ function paintCrudPage(entity, rows, query) {
   var tbody = filtered.length
     ? filtered.map(function (r) { return crudRowHtml_(entity, r); }).join('')
     : '<tr><td colspan="' + (entity.columns.length + 1) + '" class="empty-state">Tidak ada data yang cocok.</td></tr>';
+
+  var approvalHtml = entity.key === 'tasks' ? approvalPanelHtml_(pendingRequests) : '';
 
   c.innerHTML =
     '<div class="page-header">' +
@@ -527,9 +703,10 @@ function paintCrudPage(entity, rows, query) {
         '<button class="btn" id="crudAddBtn">+ Tambah</button>' +
       '</div>' +
     '</div>' +
+    approvalHtml +
     '<div class="list-card"><table class="data-table"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
 
-  document.getElementById('crudSearch').oninput = function (e) { paintCrudPage(entity, rows, e.target.value); };
+  document.getElementById('crudSearch').oninput = function (e) { paintCrudPage(entity, rows, e.target.value, pendingRequests); };
   document.getElementById('crudAddBtn').onclick = function () { (entity.customModalFn || openCrudModal)(entity, null); };
 
   c.querySelectorAll('[data-edit]').forEach(function (btn) {
@@ -553,6 +730,30 @@ function paintCrudPage(entity, rows, query) {
       openRecreateTaskModal(row);
     };
   });
+  c.querySelectorAll('[data-view]').forEach(function (btn) {
+    btn.onclick = function () {
+      var row = rows.filter(function (r) { return String(r._row) === btn.getAttribute('data-view'); })[0];
+      openViewActivityModal(row);
+    };
+  });
+  c.querySelectorAll('[data-approve]').forEach(function (btn) {
+    btn.onclick = function () { decideRecreateRequest_(Number(btn.getAttribute('data-approve')), 'Confirmed'); };
+  });
+  c.querySelectorAll('[data-decline]').forEach(function (btn) {
+    btn.onclick = function () { decideRecreateRequest_(Number(btn.getAttribute('data-decline')), 'Declined'); };
+  });
+}
+
+/** Sales Manager confirm/decline permintaan Recreate Task dari panel approval. */
+function decideRecreateRequest_(requestRow, decision) {
+  api('apiDecideRecreateTask', STATE.token, requestRow, decision).then(function () {
+    toast(decision === 'Confirmed' ? 'Recreate disetujui, task baru dibuat.' : 'Permintaan Recreate ditolak.', 'success');
+    if (STATE.pendingRecreateCount) {
+      STATE.pendingRecreateCount = Math.max(0, STATE.pendingRecreateCount - 1);
+      updateRecreateBadge_();
+    }
+    renderTaskPage_();
+  }).catch(function (err) { toast(err.message, 'error'); });
 }
 
 function filterRows_(rows, fields, query) {
@@ -583,19 +784,63 @@ function crudRowHtml_(entity, r) {
     return '<td>' + v + '</td>';
   }).join('');
   var isOverdueTask = entity.key === 'tasks' && Number(r.daysUntilDue) < 0;
-  var recreateBtn = isOverdueTask ? '<button class="btn sm" style="background:var(--warning);" data-recreate="' + r._row + '">Recreate</button>' : '';
+  var recreateBtn = '';
+  if (isOverdueTask) {
+    recreateBtn = r.recreatePending
+      ? '<span class="badge pending" style="white-space:nowrap;">Menunggu Persetujuan</span>'
+      : '<button class="btn sm" style="background:var(--warning);" data-recreate="' + r._row + '">Recreate</button>';
+  }
+  var viewBtn = entity.key === 'activity' ? '<button class="btn secondary sm" data-view="' + r._row + '">Lihat</button>' : '';
   return '<tr>' + cells +
     '<td><div class="row-actions">' +
       recreateBtn +
+      viewBtn +
       '<button class="btn secondary sm" data-edit="' + r._row + '">Edit</button>' +
       '<button class="btn danger sm" data-del="' + r._row + '">Hapus</button>' +
     '</div></td></tr>';
 }
 
 /**
- * Modal kecil untuk "Recreate" task yang overdue: task lama otomatis
- * ditandai Failed (tetap terhitung sebagai task gagal di Dashboard),
- * lalu task baru dibuat dengan data sama tapi Due Date baru.
+ * Panel "Lihat" untuk Activity Log: menampilkan isi Notes lengkap (tidak
+ * dipotong seperti di kolom list) dan Link Screenshot (kalau ada) sebagai
+ * link yang bisa diklik.
+ */
+function openViewActivityModal(row) {
+  var backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  var screenshotHtml = row.linkScreenshot
+    ? '<a href="' + esc(row.linkScreenshot) + '" target="_blank" rel="noopener">' + esc(row.linkScreenshot) + '</a>'
+    : '<span style="color:var(--text-muted);">- (belum diisi)</span>';
+  backdrop.innerHTML =
+    '<div class="modal" style="position:relative;max-width:520px;">' +
+      '<button class="close-x" id="vaClose">&times;</button>' +
+      '<h3>Detail Activity</h3>' +
+      '<div class="contact-detail-row"><span class="k">Tanggal</span><span class="v">' + esc(fmtDate(row.date)) + '</span></div>' +
+      '<div class="contact-detail-row"><span class="k">Agen</span><span class="v">' + esc(row.agen) + '</span></div>' +
+      '<div class="contact-detail-row"><span class="k">Metode</span><span class="v">' + esc(row.contactMethod) + '</span></div>' +
+      '<div class="contact-detail-row"><span class="k">Admin</span><span class="v">' + esc(row.admin) + '</span></div>' +
+      '<div class="contact-detail-row" style="display:block;"><span class="k">Link Screenshot</span><div class="v" style="max-width:100%;text-align:left;margin-top:4px;word-break:break-all;">' + screenshotHtml + '</div></div>' +
+      '<div style="margin-top:14px;">' +
+        '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text-muted);">Notes</label>' +
+        '<div style="white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.6;background:var(--bg);border-radius:var(--radius-sm);padding:12px 14px;border:1px solid var(--border);">' +
+          (row.notes ? esc(row.notes) : '<span style="color:var(--text-muted);">- (kosong)</span>') +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-actions"><button class="btn secondary" id="vaOk">Tutup</button></div>' +
+    '</div>';
+  document.body.appendChild(backdrop);
+  function close() { document.body.removeChild(backdrop); }
+  document.getElementById('vaClose').onclick = close;
+  document.getElementById('vaOk').onclick = close;
+  backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
+}
+
+/**
+ * Modal "Recreate" untuk task overdue (misal Visit Plan Zahra): TIDAK
+ * langsung dieksekusi. Ini hanya mengajukan permintaan yang perlu di-Confirm
+ * (atau Decline) oleh Sales Manager. Baru setelah di-Confirm, task lama
+ * ditandai Failed dan task baru dibuat dengan Due Date baru - jadi tetap ada
+ * 2 data (overdue lama + scheduled baru), tidak ada yang ditimpa.
  */
 function openRecreateTaskModal(row) {
   var backdrop = document.createElement('div');
@@ -603,11 +848,12 @@ function openRecreateTaskModal(row) {
   backdrop.innerHTML =
     '<div class="modal" style="position:relative;max-width:420px;">' +
       '<button class="close-x" id="rcClose">&times;</button>' +
-      '<h3>Recreate Task</h3>' +
+      '<h3>Ajukan Recreate Task</h3>' +
+      '<p class="sub" style="margin:-8px 0 14px;color:var(--text-muted);font-size:13px;">Permintaan ini akan dikirim ke Sales Manager untuk di-Confirm sebelum task baru benar-benar dibuat.</p>' +
       '<div class="field"><label>Due Date Baru *</label><input id="rc_dueDate" type="date"></div>' +
       '<div class="modal-actions">' +
         '<button class="btn secondary" id="rcCancel">Batal</button>' +
-        '<button class="btn" id="rcSave">Recreate</button>' +
+        '<button class="btn" id="rcSave">Ajukan Recreate</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(backdrop);
@@ -619,10 +865,10 @@ function openRecreateTaskModal(row) {
   document.getElementById('rcSave').onclick = function () {
     var newDueDate = document.getElementById('rc_dueDate').value;
     if (!newDueDate) { toast('Due Date baru wajib diisi.', 'error'); return; }
-    api('apiRecreateTask', STATE.token, row._row, newDueDate).then(function () {
-      toast('Task baru dibuat, task lama ditandai Failed.', 'success');
+    api('apiRequestRecreateTask', STATE.token, row._row, newDueDate).then(function () {
+      toast('Permintaan Recreate terkirim, menunggu persetujuan Sales Manager.', 'success');
       close();
-      renderCrudPage(ENTITY_TASKS);
+      renderTaskPage_();
     }).catch(function (err) { toast(err.message, 'error'); });
   };
 }
